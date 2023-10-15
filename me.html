@@ -1,0 +1,83 @@
+<div>
+    <form method="post" enctype="multipart/form-data" id="upload">
+        <input type="file" name="music_file">
+        <input type="submit">
+    </form>
+</div>
+
+<div>
+    <audio id="musicControl"></audio>
+</div>
+<div>
+    <input id="bpm" placeholder="bpm">
+    <button id="start">Start</button>
+    <button id="stop">Stop</button>
+</div>
+<div>
+    <input id="newbpm" placeholder="New BPM">
+    <input id="firstBeatOffset" placeholder="Beat Offset" value="0.616735">
+</div>
+<script>
+
+const beatSound = new Audio('wooden_fish.mp3')
+let music = new Audio()
+
+music.addEventListener('ended', () => {
+    beatSound.pause()
+    beatSound.currentTime = 0;
+})
+
+let beatCounter = undefined;
+
+document.getElementById('start').addEventListener('click', () => {
+    let bpm = Number(document.getElementById('bpm').value)
+    let firstBeatOffset = Number(document.getElementById('firstBeatOffset').value)
+    
+    let newbpm = document.getElementById('newbpm').value
+    let playbackRate = 1;
+    if (newbpm) {
+        let percentDiff = (bpm - newbpm) / bpm
+        playbackRate = 1 - percentDiff
+        bpm = newbpm;
+        firstBeatOffset = firstBeatOffset * (1 + percentDiff)
+    }
+    
+    let interval = 60 / bpm * 1000;
+    setTimeout(() => {
+        beatSound.play();
+        beatCounter = setInterval(() => {
+            beatSound.play()
+        }, interval);
+    }, firstBeatOffset * 1000)
+    music.playbackRate = playbackRate;
+    music.play()
+})
+
+document.getElementById('stop').addEventListener('click', () => {
+    if (beatCounter) {
+        clearInterval(beatCounter);
+    }
+    music.pause()
+    music.currentTime = 0;
+})
+
+document.getElementById('upload').addEventListener('submit', (e) => {
+    e.preventDefault();
+    fetch('upload', {
+        body: new FormData(document.getElementById('upload')),
+        method: 'post'
+    })
+    .then(res => res.json())
+    .then(json => {
+        console.log(json)
+        document.getElementById('bpm').value = json.bpm
+        document.getElementById('firstBeatOffset').value = json.offset
+        music.src = URL.createObjectURL(document.querySelector('#upload input[type=file]').files[0])
+    })
+    .catch(err => {
+        console.error(err)
+        alert(err)
+    })
+})
+
+</script>
