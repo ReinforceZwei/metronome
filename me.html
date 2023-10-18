@@ -5,30 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metronome</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
 </head>
-<body>
-    <div>
-        <form method="post" enctype="multipart/form-data" id="upload">
-            <input type="file" name="music_file">
-            <input type="submit">
-        </form>
+<body data-bs-theme="dark">
+    <div class="container d-flex flex-column vh-100">
+        
+        <h1 class="text-center">Metronome</h1>
+        
+        <div>
+            <h3 class="text-center">BPM</h3>
+            <div class="input-group mb-3">
+                <button class="btn btn-outline-primary btn-lg">-</button>
+                <input id="bpm" placeholder="bpm" value="120" class="form-control fs-2">
+                <button class="btn btn-outline-primary btn-lg">+</button>
+            </div>
+            <button id="start" class="btn btn-primary btn-lg">Start</button>
+            <button id="stop" class="btn btn-primary btn-lg">Stop</button>
+        </div>
+
+        <hr>
+
+        <div>
+            <!-- <form method="post" enctype="multipart/form-data" id="upload">
+                
+            </form> -->
+            <h3 class="text-center">Select Music File</h3>
+            <input type="file" name="music_file" class="form-control">
+        </div>
+        
+        <div>
+            <div>
+                <h3 class="text-center">Change Speed</h3>
+                <div class="input-group mb-3">
+                    <button class="btn btn-outline-primary btn-lg">-</button>
+                    <input id="newbpm" placeholder="New BPM"class="form-control">
+                    <button class="btn btn-outline-primary btn-lg">+</button>
+                </div>
+            </div>
+            
+            <div class="input-group mb-3">
+                <button class="btn btn-outline-primary btn-lg">-</button>
+                <input id="firstBeatOffset" placeholder="Beat Offset" class="form-control">
+                <button class="btn btn-outline-primary btn-lg">+</button>
+            </div>
+
+            <button class="btn btn-outline-primary btn-lg">Set Offset At Current Time</button>
+        </div>
+        <div class="flex-fill" style="margin-bottom: auto;"></div>
+        <div>
+            <audio id="musicControl" class="w-100" controls></audio>
+        </div>
     </div>
     
-    <div>
-        <audio id="musicControl" controls></audio>
-    </div>
-    <div>
-        <input id="bpm" placeholder="bpm" value="120">
-        <button id="start">Start</button>
-        <button id="stop">Stop</button>
-    </div>
-    <div>
-        <input id="newbpm" placeholder="New BPM">
-        <input id="firstBeatOffset" placeholder="Beat Offset">
-    </div>
 <script>
 
-const beatSound = new Audio('wooden_fish.mp3')
+const soundSrc = 'wooden_fish.mp3';
+const beatSound = new Audio(soundSrc)
 let music = $('#musicControl')[0]
 
 let audioContext = new AudioContext();
@@ -54,6 +86,10 @@ function scheduleNote( beatNumber, time ) {
 
     osc.start( time );
     osc.stop( time + noteLength );
+}
+function scheduleNote2(beatNumber, time) {
+    let sound = new Audio(soundSrc)
+    sound.play()
 }
 
 let beatCounter = undefined;
@@ -130,6 +166,7 @@ document.getElementById('upload').addEventListener('submit', (e) => {
 })
 
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     </body>
 </html>
 
