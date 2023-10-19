@@ -60,24 +60,31 @@
         </div>
         <div class="flex-fill" style="margin-bottom: auto;"></div>
         <div>
-            <audio id="musicControl" class="w-100" controls src="marigold 2.mp3"></audio>
+            <audio id="musicControl" class="w-100" controls ></audio>
         </div>
     </div>
     
 
 <script>
-
+fetch('marigold 2.mp3')
+.then(res => res.blob())
+.then(b => {
+    $('#musicControl')[0].src = URL.createObjectURL(b)
+})
 class MusicMetronome {
     constructor(audioControlId, bpm, offset) {
         this.bpm = Number(bpm);
         this.offset = Number(offset);
         this.newBpm = this.bpm;
+        this._changeSpeed = false;
 
         this._musicVolume = 0.7;
         this._audioControl = $(audioControlId)[0]
         this._audioControl.volume = this._musicVolume;
         // Set to true when next interval need to change bpm
         this._isBpmChanged = false;
+        this._isOffsetChanged = false;
+        this._offsetDiff = 0; // should reset to 0 after use
 
         this._volume = 0.5;
         this._interval = undefined;
@@ -86,24 +93,26 @@ class MusicMetronome {
         this._volumeControl.connect(this._ctx.destination);
         this._volumeControl.gain.value = this._volume;
 
-        this._osc = this._ctx.createOscillator();
-        this._osc.connect(this._volumeControl);
-
         this._noteCount = 0;
     }
 
     start() {
-        if (this._interval != undefined)
+        if (this._interval != undefined) {
             return;
+        }
+
+        let bpm = this._changeSpeed ? this.newBpm : this.bpm;
+        let interval = 60 / bpm * 1000;
         
-        let interval = 60 / this.bpm * 1000;
         // Start the metronome as soon as possible
         let startOffset = this.offset % interval;
         // But maintain first beat count
-        this._noteCount = Math.floor(this.offset / interval) % 4;
+        if (!this._isBpmChanged) {
+            this._noteCount = Math.floor((this._audioControl.currentTime + this.offset) / interval) % 4;
+        }
 
         let playbackRate = 1;
-        if (this.bpm != this.newBpm) {
+        if (this._changeSpeed) {
             let percentDiff = (this.bpm - this.newBpm) / this.bpm
             playbackRate = 1 - percentDiff;
             startOffset = startOffset * (1 + percentDiff)
@@ -112,19 +121,47 @@ class MusicMetronome {
         if (this._isBpmChanged) {
             startOffset = 0;
         }
-        setTimeout(() => {
-            this._isBpmChanged = false;
+        if (this._isOffsetChanged) {
+            startOffset = (interval / 1000) + this._offsetDiff;
+            this._offsetDiff = 0;
+        }
+        let startAt = this._audioControl.currentTime + startOffset;
 
-            this._playNote();
-            this._interval = setInterval(() => {
-                if (this._isBpmChanged) {
-                    clearInterval(this._interval);
-                    this._interval = undefined;
-                    this.start();
-                }
+        let startCheck = setInterval(() => {
+            if (this._audioControl.currentTime >= startAt) {
+                this._isBpmChanged = false;
+                this._isOffsetChanged = false;
                 this._playNote();
-            })
-        }, startOffset * 1000);
+                this._interval = setInterval(() => {
+                    this._playNote();
+                    if (this._isBpmChanged || this._isOffsetChanged) {
+                        clearInterval(this._interval);
+                        this._interval = undefined;
+                        this.start();
+                        return;
+                    }
+                    
+                }, interval)
+                clearInterval(startCheck);
+            }
+        }, 15) // 15 ms
+        
+        // setTimeout(() => {
+        //     this._isBpmChanged = false;
+        //     this._isOffsetChanged = false;
+
+        //     this._playNote();
+        //     this._interval = setInterval(() => {
+        //         this._playNote();
+        //         if (this._isBpmChanged || this._isOffsetChanged) {
+        //             clearInterval(this._interval);
+        //             this._interval = undefined;
+        //             this.start();
+        //             return;
+        //         }
+                
+        //     }, interval)
+        // }, startOffset * 1000);
 
         this._audioControl.playbackRate = playbackRate;
         if (!this._isBpmChanged) {
@@ -144,8 +181,25 @@ class MusicMetronome {
         this._noteCount = 0;
     }
 
-    adjust(bpm) {
-        this.newBpm = Number(bpm);
+    setBpm(bpm) {
+        this.bpm = Number(bpm);
+        this._isBpmChanged = true;
+    }
+
+    setOffset(offset) {
+        this._offsetDiff = Number(offset) - this.offset;
+        this.offset = Number(offset);
+        this._isOffsetChanged = true;
+    }
+
+    changeSpeed(newBpm) {
+        this.newBpm = newBpm;
+        this._changeSpeed = true;
+        this._isBpmChanged = true;
+    }
+
+    restoreSpeed() {
+        this._changeSpeed = false;
         this._isBpmChanged = true;
     }
 
@@ -160,11 +214,13 @@ class MusicMetronome {
     }
 
     _playNote() {
-        this._osc.frequency = this._noteCount % 4 == 0 ? 880.0 : 440.0;
+        let osc = this._ctx.createOscillator();
+        osc.connect(this._volumeControl);
+        osc.frequency.value = this._noteCount % 4 == 0 ? 880.0 : 440.0;
 
         let curTime = this._ctx.currentTime;
-        this._osc.start(curTime);
-        this._osc.stop(curTime + 0.07);
+        osc.start(curTime);
+        osc.stop(curTime + 0.07);
         this._noteCount += 1;
     }
 }
