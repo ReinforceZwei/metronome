@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metronome</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body data-bs-theme="dark">
+    <div class="container d-flex flex-column vh-100" id="app">        
+        <h1 class="text-center">Metronome</h1>
+        
+        <div>
+            <h3 class="text-center">BPM</h3>
+            <div class="input-group mb-3">
+                <button class="btn btn-outline-primary btn-lg" @click="bpm--">-</button>
+                <input placeholder="bpm" type="number" v-model="bpm" class="form-control fs-2">
+                <button class="btn btn-outline-primary btn-lg" @click="bpm++">+</button>
+            </div>
+            <button id="start" class="btn btn-primary btn-lg">Start</button>
+            <button id="stop" class="btn btn-primary btn-lg">Stop</button>
+        </div>
+
+        <hr>
+
+        <div>
+            <!-- <form method="post" enctype="multipart/form-data" id="upload">
+                
+            </form> -->
+            <h3 class="text-center">Select Music File</h3>
+            <input type="file" name="music_file" class="form-control" id="upload">
+        </div>
+        
+        <div>
+            <div>
+                <h3 class="text-center">Change Speed</h3>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" v-model="changeBpm">
+                    <label class="form-check-label" for="change-bpm">Enable</label>
+                </div>
+                <div class="input-group mb-3">
+                    <button class="btn btn-outline-primary btn-lg" @click="newBpm--">-</button>
+                    <input id="newbpm" placeholder="New BPM" class="form-control" v-model="newBpm">
+                    <button class="btn btn-outline-primary btn-lg" @click="newBpm++">+</button>
+                </div>
+            </div>
+            
+            <div class="input-group mb-3">
+                <button class="btn btn-outline-primary btn-lg" @click="offset -= 0.1">-</button>
+                <input id="offset" placeholder="Beat Offset" class="form-control" v-model="offset">
+                <button class="btn btn-outline-primary btn-lg" @click="offset += 0.1">+</button>
+            </div>
+
+            <button class="btn btn-outline-primary btn-lg">Set Offset At Current Time</button>
+        </div>
+        <div class="flex-fill" style="margin-bottom: auto;"></div>
+        <div>
+            <audio id="musicControl" class="w-100" controls></audio>
+        </div>
+    </div>
+    
+
+<script>
+const { createApp, ref, computed } = Vue
+
+createApp({
+    setup() {
+        const bpm = ref(120);
+        const changeBpm = ref(false);
+        const newBpm = ref(120);
+        const _offset = ref(0);
+        const offset = computed({
+            get() {
+                console.log(_offset.value)
+                return _offset.value ? Number(_offset.value.toFixed(6)) : _offset.value
+            },
+            set(value) {
+                _offset.value = Number(value);
+            }
+        });
+
+        return {
+            bpm,
+            changeBpm,
+            newBpm,
+            offset,
+        }
+    }
+}).mount('#app')
+</script>
+    <!--
+<script>
+
+let bpm; updateBpm();
+let changeBpm; updateChangeBpm();
+let newBpm; updateNewBpm();
+let offset; updateOffset();
+
+// Get value from DOM and put it to JS variable
+function updateBpm() {
+    bpm = Number($('#bpm').val())
+}
+function updateNewBpm() {
+    newBpm = Number($('#newbpm').val())
+}
+function updateOffset() {
+    offset = Number($('#offset').val())
+}
+function updateChangeBpm() {
+    changeBpm = $('#change-bpm')[0].checked
+}
+$('#bpm').change((e) => {
+    updateBpm()
+})
+$('#bpm-up').click(() => {
+    $('#bpm').val(Number($('#bpm').val()) + 1)
+    updateBpm()
+    if (!changeBpm) {
+        $('#newbpm').val($('#bpm').val())
+        updateNewBpm()
+    }
+})
+$('#bpm-down').click(() => {
+    $('#bpm').val(Number($('#bpm').val()) - 1)
+    updateBpm()
+    if (!changeBpm) {
+        $('#newbpm').val($('#bpm').val())
+        updateNewBpm()
+    }
+})
+$('#change-bpm').change(() => {
+    updateChangeBpm()
+})
+$('#newbpm-up').click(() => {
+    $('#newbpm').val(Number($('#newbpm').val()) + 1)
+    updateNewBpm()
+})
+$('#newbpm-down').click(() => {
+    $('#newbpm').val(Number($('#newbpm').val()) - 1)
+    updateNewBpm()
+})
+
+const soundSrc = 'wooden_fish.mp3';
+const beatSound = new Audio(soundSrc)
+const beatSounds = []
+let beatCount = 0;
+for (let i = 0; i < 16; i++) {
+    beatSounds[i] = new Audio(soundSrc)
+}
+let music = $('#musicControl')[0]
+
+let audioContext = new AudioContext();
+let volumeGain = audioContext.createGain()
+volumeGain.gain.value = 0.5;
+volumeGain.connect(audioContext.destination)
+let noteLength = 0.05;
+function scheduleNote( beatNumber, time ) {
+    // if ( (noteResolution==1) && (beatNumber%2))
+    //     return; // we're not playing non-8th 16th notes
+    // if ( (noteResolution==2) && (beatNumber%4))
+    //     return; // we're not playing non-quarter 8th notes
+
+    // create an oscillator
+    var osc = audioContext.createOscillator();
+    osc.connect( volumeGain );
+    if (beatNumber % 4 === 0 )    // quarter notes = medium pitch
+        osc.frequency.value = 880.0;
+    else                        // other 16th notes = low pitch
+        osc.frequency.value = 440.0;
+
+    osc.start( time );
+    osc.stop( time + noteLength );
+}
+
+let startTime = 0;
+let next = 0;
+let running = false;
+function beatLoop() {
+    if (!running) return;
+    if (Date.now() >= next) {
+        scheduleNote(beatCount, audioContext.currentTime)
+        beatCount++;
+        next = Date.now() + (60 / bpm * 1000) + (offset * 1000);
+    }
+    requestAnimationFrame(beatLoop)
+}
+
+let beatCounter = undefined;
+
+let musicControl = $('#musicControl');
+musicControl.on('ended', () => {
+    clearInterval(beatCounter)
+})
+musicControl.on('seeking', () => {
+    if (beatCounter) clearInterval(beatCounter)
+})
+musicControl.on('playing', () => {
+    $('#start').click()
+})
+musicControl.on('pause', () => {
+    if (beatCounter) clearInterval(beatCounter)
+})
+
+$('#upload').on('change', () => {
+    music.src = URL.createObjectURL($('#upload')[0].files[0])
+    console.log("???")
+})
+
+$('#start').on('click', () => {
+    //music.src = URL.createObjectURL(document.querySelector('#upload input[type=file]').files[0])
+    let bpm = Number($('#bpm').val())
+    let firstBeatOffset = Number($('#firstBeatOffset').val())
+    
+    let newbpm = $('#newbpm').val()
+    let playbackRate = 1;
+    if (newbpm) {
+        let percentDiff = (bpm - newbpm) / bpm
+        playbackRate = 1 - percentDiff
+        bpm = newbpm;
+        firstBeatOffset = firstBeatOffset * (1 + percentDiff)
+    }
+    
+    // let interval = 60 / bpm * 1000;
+    // setTimeout(() => {
+    //     scheduleNote(0, audioContext.currentTime)
+    //     beatCount++;
+    //     beatCounter = setInterval(() => {
+    //         scheduleNote(beatCount, audioContext.currentTime)
+    //         beatCount++;
+    //     }, interval);
+    // }, firstBeatOffset * 1000)
+    music.playbackRate = playbackRate;
+    music.play()
+    running = true;
+    beatLoop()
+})
+
+document.getElementById('stop').addEventListener('click', () => {
+    if (beatCounter) {
+        clearInterval(beatCounter);
+    }
+    beatCount = 0
+    music.pause()
+    music.currentTime = 0;
+    running = false
+})
+
+// document.getElementById('upload').addEventListener('submit', (e) => {
+//     e.preventDefault();
+//     fetch('upload', {
+//         body: new FormData(document.getElementById('upload')),
+//         method: 'post'
+//     })
+//     .then(res => res.json())
+//     .then(json => {
+//         console.log(json)
+//         document.getElementById('bpm').value = json.bpm
+//         document.getElementById('firstBeatOffset').value = json.offset
+//         music.src = URL.createObjectURL(document.querySelector('#upload input[type=file]').files[0])
+//     })
+//     .catch(err => {
+//         console.error(err)
+//         alert(err)
+//     })
+// })
+
+</script>
+-->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    </body>
+</html>
+
