@@ -19,8 +19,8 @@
                 <input placeholder="bpm" type="number" v-model="bpm" class="form-control fs-2">
                 <button class="btn btn-outline-primary btn-lg" @click="bpm++">+</button>
             </div>
-            <button id="start" class="btn btn-primary btn-lg">Start</button>
-            <button id="stop" class="btn btn-primary btn-lg">Stop</button>
+            <button id="start" class="btn btn-primary btn-lg" @click="start()">Start</button>
+            <button id="stop" class="btn btn-primary btn-lg" @click="stop()">Stop</button>
         </div>
 
         <hr>
@@ -81,11 +81,23 @@ createApp({
             }
         });
 
+        function start() {
+            console.log('start click')
+        }
+        function stop() {
+            console.log('stop click')
+        }
+
         return {
+            // Variables
             bpm,
             changeBpm,
             newBpm,
             offset,
+
+            // Methods
+            start,
+            stop,
         }
     }
 }).mount('#app')
