@@ -15,10 +15,11 @@
         <div>
             <h3 class="text-center">BPM</h3>
             <div class="input-group mb-3">
-                <button class="btn btn-outline-primary btn-lg" @click="bpm--">-</button>
+                <button class="btn btn-outline-primary btn-lg" @click="bpmDown">-</button>
                 <input placeholder="bpm" type="number" v-model="bpm" class="form-control fs-2">
-                <button class="btn btn-outline-primary btn-lg" @click="bpm++">+</button>
+                <button class="btn btn-outline-primary btn-lg" @click="bpmUp">+</button>
             </div>
+            <input type="range" class="form-range" min="0" max="1" step="0.01" v-model="volume">
             <button id="start" class="btn btn-primary btn-lg" @click="start()">Start</button>
             <button id="stop" class="btn btn-primary btn-lg" @click="stop()">Stop</button>
         </div>
@@ -40,6 +41,7 @@
                     <input class="form-check-input" type="checkbox" role="switch" v-model="changeBpm">
                     <label class="form-check-label" for="change-bpm">Enable</label>
                 </div>
+                <label class="form-check-label">Adjust Speed</label>
                 <div class="input-group mb-3">
                     <button class="btn btn-outline-primary btn-lg" @click="newBpm--">-</button>
                     <input id="newbpm" placeholder="New BPM" class="form-control" v-model="newBpm">
@@ -47,6 +49,7 @@
                 </div>
             </div>
             
+            <label class="form-check-label">Offset</label>
             <div class="input-group mb-3">
                 <button class="btn btn-outline-primary btn-lg" @click="offset -= 0.1">-</button>
                 <input id="offset" placeholder="Beat Offset" class="form-control" v-model="offset">
@@ -63,7 +66,7 @@
     
 
 <script>
-const { createApp, ref, computed } = Vue
+const { createApp, ref, computed, watch } = Vue
 
 createApp({
     setup() {
@@ -80,12 +83,44 @@ createApp({
                 _offset.value = Number(value);
             }
         });
+        const _volume = ref(0.5);
+        const volume = computed({
+            get() {
+                return _volume.value
+            },
+            set(value) {
+                _volume.value = Number(value);
+            }
+        });
+
+        let audioContext = new AudioContext();
+        let volumeGain = audioContext.createGain()
+        volumeGain.gain.value = volume.value;
+        volumeGain.connect(audioContext.destination)
+
+        // watch(volume, (newVolume) => {
+        //     console.log(newVolume)
+        //     volumeGain.gain.value = newVolume;
+        // })
 
         function start() {
             console.log('start click')
+            console.log(bpm.value, volume.value)
         }
         function stop() {
             console.log('stop click')
+        }
+        function bpmUp() {
+            bpm.value++;
+            if (!changeBpm.value) {
+                newBpm.value = bpm.value
+            }
+        }
+        function bpmDown() {
+            bpm.value--;
+            if (!changeBpm.value) {
+                newBpm.value = bpm.value
+            }
         }
 
         return {
@@ -94,10 +129,13 @@ createApp({
             changeBpm,
             newBpm,
             offset,
+            volume,
 
             // Methods
             start,
             stop,
+            bpmUp,
+            bpmDown,
         }
     }
 }).mount('#app')
