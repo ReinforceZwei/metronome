@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Metronome</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
@@ -31,7 +31,7 @@
                 
             </form> -->
             <h3 class="text-center">Select Music File</h3>
-            <input type="file" name="music_file" class="form-control" id="upload">
+            <input type="file" name="music_file" class="form-control" id="upload" @change="changeMusicFile()">
         </div>
         
         <div>
@@ -58,7 +58,7 @@
 
             <button class="btn btn-outline-primary btn-lg">Set Offset At Current Time</button>
         </div>
-        <div class="flex-fill" style="margin-bottom: auto;"></div>
+        <!-- <div class="flex-fill" style="margin-bottom: auto;"></div> -->
         <div>
             <audio id="musicControl" class="w-100" controls ></audio>
         </div>
@@ -66,141 +66,99 @@
     
 
 <script>
-fetch('marigold 2.mp3')
-.then(res => res.blob())
-.then(b => {
-    $('#musicControl')[0].src = URL.createObjectURL(b)
-})
+// fetch('marigold 2.mp3')
+// .then(res => res.blob())
+// .then(b => {
+//     $('#musicControl')[0].src = URL.createObjectURL(b)
+// })
 class MusicMetronome {
     constructor(audioControlId, bpm, offset) {
         this.bpm = Number(bpm);
         this.offset = Number(offset);
         this.newBpm = this.bpm;
         this._changeSpeed = false;
+        this._running = false;
 
         this._musicVolume = 0.7;
         this._audioControl = $(audioControlId)[0]
         this._audioControl.volume = this._musicVolume;
-        // Set to true when next interval need to change bpm
-        this._isBpmChanged = false;
-        this._isOffsetChanged = false;
-        this._offsetDiff = 0; // should reset to 0 after use
 
         this._volume = 0.5;
-        this._interval = undefined;
         this._ctx = new AudioContext();
         this._volumeControl = this._ctx.createGain();
         this._volumeControl.connect(this._ctx.destination);
         this._volumeControl.gain.value = this._volume;
 
-        this._noteCount = 0;
+        this._prevBeat = undefined;
     }
 
     start() {
-        if (this._interval != undefined) {
+        this._running = true;
+        this._scheduleNote();
+        this._audioControl.play();
+    }
+
+    _scheduleNote() {
+        if (!this._running) {
             return;
         }
 
-        let bpm = this._changeSpeed ? this.newBpm : this.bpm;
-        let interval = 60 / bpm * 1000;
-        
-        // Start the metronome as soon as possible
-        let startOffset = this.offset % interval;
-        // But maintain first beat count
-        if (!this._isBpmChanged) {
-            this._noteCount = Math.floor((this._audioControl.currentTime + this.offset) / interval) % 4;
+        setTimeout(() => this._scheduleNote(), 15);
+        if (this._audioControl.paused) {
+            return;
         }
 
+        let currentTime = this._audioControl.currentTime;
+        let bpm = this.bpm;
+        let interval = 60 / bpm; // In second
+        let offset = this.offset;
+        let currentBeat = Math.floor((currentTime + offset) / interval);
+        
         let playbackRate = 1;
         if (this._changeSpeed) {
             let percentDiff = (this.bpm - this.newBpm) / this.bpm
             playbackRate = 1 - percentDiff;
-            startOffset = startOffset * (1 + percentDiff)
         }
-
-        if (this._isBpmChanged) {
-            startOffset = 0;
+        //console.log(this._prevBeat, currentBeat, this._prevBeat < currentBeat)
+        if (this._prevBeat == undefined) {
+            this._prevBeat = currentBeat;
         }
-        if (this._isOffsetChanged) {
-            startOffset = (interval / 1000) + this._offsetDiff;
-            this._offsetDiff = 0;
-        }
-        let startAt = this._audioControl.currentTime + startOffset;
-
-        let startCheck = setInterval(() => {
-            if (this._audioControl.currentTime >= startAt) {
-                this._isBpmChanged = false;
-                this._isOffsetChanged = false;
-                this._playNote();
-                this._interval = setInterval(() => {
-                    this._playNote();
-                    if (this._isBpmChanged || this._isOffsetChanged) {
-                        clearInterval(this._interval);
-                        this._interval = undefined;
-                        this.start();
-                        return;
-                    }
-                    
-                }, interval)
-                clearInterval(startCheck);
+        if (this._prevBeat != currentBeat) {
+            this._prevBeat = currentBeat;
+            if (this._audioControl.playbackRate != playbackRate) {
+                this._audioControl.playbackRate = playbackRate;
             }
-        }, 15) // 15 ms
-        
-        // setTimeout(() => {
-        //     this._isBpmChanged = false;
-        //     this._isOffsetChanged = false;
-
-        //     this._playNote();
-        //     this._interval = setInterval(() => {
-        //         this._playNote();
-        //         if (this._isBpmChanged || this._isOffsetChanged) {
-        //             clearInterval(this._interval);
-        //             this._interval = undefined;
-        //             this.start();
-        //             return;
-        //         }
-                
-        //     }, interval)
-        // }, startOffset * 1000);
-
-        this._audioControl.playbackRate = playbackRate;
-        if (!this._isBpmChanged) {
-            this._audioControl.play();
+            this._playNote();
         }
     }
 
     pause() {
-
+        this._running = false;
+        this._audioControl.pause();
     }
 
     stop() {
-        clearInterval(this._interval);
-        this._interval = undefined;
+        this._running = false;
         this._audioControl.pause();
         this._audioControl.currentTime = 0;
-        this._noteCount = 0;
+        this._prevBeat = undefined;
     }
 
     setBpm(bpm) {
         this.bpm = Number(bpm);
-        this._isBpmChanged = true;
     }
 
     setOffset(offset) {
-        this._offsetDiff = Number(offset) - this.offset;
         this.offset = Number(offset);
-        this._isOffsetChanged = true;
     }
 
     changeSpeed(newBpm) {
         this.newBpm = newBpm;
         this._changeSpeed = true;
-        this._isBpmChanged = true;
     }
 
     restoreSpeed() {
         this._changeSpeed = false;
-        this._isBpmChanged = true;
     }
 
     setVolume(volume) {
@@ -216,19 +174,18 @@ class MusicMetronome {
     _playNote() {
         let osc = this._ctx.createOscillator();
         osc.connect(this._volumeControl);
-        osc.frequency.value = this._noteCount % 4 == 0 ? 880.0 : 440.0;
+        osc.frequency.value = this._prevBeat % 4 == 0 ? 880.0 : 440.0;
 
         let curTime = this._ctx.currentTime;
         osc.start(curTime);
         osc.stop(curTime + 0.07);
-        this._noteCount += 1;
     }
 }
 
 </script>
 
 <script>
-const { createApp, ref, computed, watch } = Vue
+const { createApp, ref, computed, watch, onMounted } = Vue
 
 createApp({
     setup() {
@@ -254,23 +211,45 @@ createApp({
                 _volume.value = Number(value);
             }
         });
+        const musicFile = ref();
 
-        let audioContext = new AudioContext();
-        let volumeGain = audioContext.createGain()
-        volumeGain.gain.value = volume.value;
-        volumeGain.connect(audioContext.destination)
+        let musicMetronome;// = new MusicMetronome('#musicControl', bpm.value, offset.value);
+        onMounted(() => {
+            musicMetronome = new MusicMetronome('#musicControl', bpm.value, offset.value);
+        })
 
-        // watch(volume, (newVolume) => {
-        //     console.log(newVolume)
-        //     volumeGain.gain.value = newVolume;
-        // })
+        watch(_volume, (newVolume) => {
+            musicMetronome.setVolume(newVolume);
+        });
+
+        watch(bpm, (newBpm) => {
+            musicMetronome.setBpm(newBpm);
+        });
+
+        watch(changeBpm, (value) => {
+            if (value) {
+                musicMetronome.changeSpeed(newBpm.value);
+            } else {
+                musicMetronome.restoreSpeed();
+            }
+        });
+
+        watch(newBpm, (value) => {
+            if (changeBpm.value) {
+                musicMetronome.changeSpeed(value);
+            }
+        });
+
+        watch(_offset, (newOffset) => {
+            musicMetronome.setOffset(newOffset);
+        });
 
         function start() {
             console.log('start click')
-            console.log(bpm.value, volume.value)
+            musicMetronome.start();
         }
         function stop() {
-            console.log('stop click')
+            musicMetronome.pause();
         }
         function bpmUp() {
             bpm.value++;
@@ -284,6 +263,9 @@ createApp({
                 newBpm.value = bpm.value
             }
         }
+        function changeMusicFile() {
+            $('#musicControl')[0].src = URL.createObjectURL($('#upload')[0].files[0]);
+        }
 
         return {
             // Variables
@@ -292,194 +274,19 @@ createApp({
             newBpm,
             offset,
             volume,
+            musicFile,
 
             // Methods
             start,
             stop,
             bpmUp,
             bpmDown,
+            changeMusicFile,
         }
     }
 }).mount('#app')
+//let a = new MusicMetronome('#musicControl', 106, 1.66)
 </script>
-    <!--
-<script>
-
-let bpm; updateBpm();
-let changeBpm; updateChangeBpm();
-let newBpm; updateNewBpm();
-let offset; updateOffset();
-
-// Get value from DOM and put it to JS variable
-function updateBpm() {
-    bpm = Number($('#bpm').val())
-}
-function updateNewBpm() {
-    newBpm = Number($('#newbpm').val())
-}
-function updateOffset() {
-    offset = Number($('#offset').val())
-}
-function updateChangeBpm() {
-    changeBpm = $('#change-bpm')[0].checked
-}
-$('#bpm').change((e) => {
-    updateBpm()
-})
-$('#bpm-up').click(() => {
-    $('#bpm').val(Number($('#bpm').val()) + 1)
-    updateBpm()
-    if (!changeBpm) {
-        $('#newbpm').val($('#bpm').val())
-        updateNewBpm()
-    }
-})
-$('#bpm-down').click(() => {
-    $('#bpm').val(Number($('#bpm').val()) - 1)
-    updateBpm()
-    if (!changeBpm) {
-        $('#newbpm').val($('#bpm').val())
-        updateNewBpm()
-    }
-})
-$('#change-bpm').change(() => {
-    updateChangeBpm()
-})
-$('#newbpm-up').click(() => {
-    $('#newbpm').val(Number($('#newbpm').val()) + 1)
-    updateNewBpm()
-})
-$('#newbpm-down').click(() => {
-    $('#newbpm').val(Number($('#newbpm').val()) - 1)
-    updateNewBpm()
-})
-
-const soundSrc = 'wooden_fish.mp3';
-const beatSound = new Audio(soundSrc)
-const beatSounds = []
-let beatCount = 0;
-for (let i = 0; i < 16; i++) {
-    beatSounds[i] = new Audio(soundSrc)
-}
-let music = $('#musicControl')[0]
-
-let audioContext = new AudioContext();
-let volumeGain = audioContext.createGain()
-volumeGain.gain.value = 0.5;
-volumeGain.connect(audioContext.destination)
-let noteLength = 0.05;
-function scheduleNote( beatNumber, time ) {
-    // if ( (noteResolution==1) && (beatNumber%2))
-    //     return; // we're not playing non-8th 16th notes
-    // if ( (noteResolution==2) && (beatNumber%4))
-    //     return; // we're not playing non-quarter 8th notes
-
-    // create an oscillator
-    var osc = audioContext.createOscillator();
-    osc.connect( volumeGain );
-    if (beatNumber % 4 === 0 )    // quarter notes = medium pitch
-        osc.frequency.value = 880.0;
-    else                        // other 16th notes = low pitch
-        osc.frequency.value = 440.0;
-
-    osc.start( time );
-    osc.stop( time + noteLength );
-}
-
-let startTime = 0;
-let next = 0;
-let running = false;
-function beatLoop() {
-    if (!running) return;
-    if (Date.now() >= next) {
-        scheduleNote(beatCount, audioContext.currentTime)
-        beatCount++;
-        next = Date.now() + (60 / bpm * 1000) + (offset * 1000);
-    }
-    requestAnimationFrame(beatLoop)
-}
-
-let beatCounter = undefined;
-
-let musicControl = $('#musicControl');
-musicControl.on('ended', () => {
-    clearInterval(beatCounter)
-})
-musicControl.on('seeking', () => {
-    if (beatCounter) clearInterval(beatCounter)
-})
-musicControl.on('playing', () => {
-    $('#start').click()
-})
-musicControl.on('pause', () => {
-    if (beatCounter) clearInterval(beatCounter)
-})
-
-$('#upload').on('change', () => {
-    music.src = URL.createObjectURL($('#upload')[0].files[0])
-    console.log("???")
-})
-
-$('#start').on('click', () => {
-    //music.src = URL.createObjectURL(document.querySelector('#upload input[type=file]').files[0])
-    let bpm = Number($('#bpm').val())
-    let firstBeatOffset = Number($('#firstBeatOffset').val())
-    
-    let newbpm = $('#newbpm').val()
-    let playbackRate = 1;
-    if (newbpm) {
-        let percentDiff = (bpm - newbpm) / bpm
-        playbackRate = 1 - percentDiff
-        bpm = newbpm;
-        firstBeatOffset = firstBeatOffset * (1 + percentDiff)
-    }
-    
-    // let interval = 60 / bpm * 1000;
-    // setTimeout(() => {
-    //     scheduleNote(0, audioContext.currentTime)
-    //     beatCount++;
-    //     beatCounter = setInterval(() => {
-    //         scheduleNote(beatCount, audioContext.currentTime)
-    //         beatCount++;
-    //     }, interval);
-    // }, firstBeatOffset * 1000)
-    music.playbackRate = playbackRate;
-    music.play()
-    running = true;
-    beatLoop()
-})
-
-document.getElementById('stop').addEventListener('click', () => {
-    if (beatCounter) {
-        clearInterval(beatCounter);
-    }
-    beatCount = 0
-    music.pause()
-    music.currentTime = 0;
-    running = false
-})
-
-// document.getElementById('upload').addEventListener('submit', (e) => {
-//     e.preventDefault();
-//     fetch('upload', {
-//         body: new FormData(document.getElementById('upload')),
-//         method: 'post'
-//     })
-//     .then(res => res.json())
-//     .then(json => {
-//         console.log(json)
-//         document.getElementById('bpm').value = json.bpm
-//         document.getElementById('firstBeatOffset').value = json.offset
-//         music.src = URL.createObjectURL(document.querySelector('#upload input[type=file]').files[0])
-//     })
-//     .catch(err => {
-//         console.error(err)
-//         alert(err)
-//     })
-// })
-
-</script>
--->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     </body>
 </html>
