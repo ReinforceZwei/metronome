@@ -7,9 +7,26 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        button {
+            touch-action: manipulation;
+        }
+    </style>
 </head>
 <body data-bs-theme="dark">
-    <div class="container d-flex flex-column vh-100" id="app">        
+    <svg style="display: none" version="2.0">
+        <defs>
+            <symbol id="music-note" >
+                <path d="M9 13c0 1.105-1.12 2-2.5 2S4 14.105 4 13s1.12-2 2.5-2 2.5.895 2.5 2z" fill="#0d6efd" />
+                <path fill-rule="evenodd" d="M9 3v10H8V3h1z" fill="#0d6efd" />
+                <path d="M8 2.82a1 1 0 0 1 .804-.98l3-.6A1 1 0 0 1 13 2.22V4L8 5V2.82z" fill="#0d6efd" />
+            </symbol>
+        </defs>
+        <!-- to make the circle-arrow-left.svg file
+                     also usable as image: -->
+        <use href="#music-note" />
+    </svg>
+    <div class="container d-flex flex-column" id="app">        
         <h1 class="text-center">Metronome</h1>
         
         <div>
@@ -20,19 +37,27 @@
                 <button class="btn btn-outline-primary btn-lg" @click="bpmUp">+</button>
             </div>
             <input type="range" class="form-range" min="0" max="1" step="0.01" v-model="volume">
-            <button id="start" class="btn btn-primary btn-lg" @click="start()">Start</button>
-            <button id="stop" class="btn btn-primary btn-lg" @click="stop()">Stop</button>
         </div>
-
-        <hr>
 
         <div>
             <!-- <form method="post" enctype="multipart/form-data" id="upload">
                 
             </form> -->
             <h3 class="text-center">Select Music File</h3>
-            <input type="file" name="music_file" class="form-control" id="upload" @change="changeMusicFile()">
+            <input type="file" accept="audio/mp3, audio/wav" name="music_file" class="form-control" id="upload" @change="changeMusicFile()">
         </div>
+
+        <div>
+            <label class="form-check-label">Music Volume</label>
+            <input type="range" class="form-range" min="0" max="1" step="0.01" v-model="musicVolume">
+        </div>
+
+        <div class="d-flex justify-content-around">
+            <button id="start" class="btn btn-success" @click="start()">Start</button>
+            <button id="stop" class="btn btn-danger" @click="stop()">Stop</button>
+        </div>
+
+        <hr>
         
         <div>
             <div>
@@ -51,12 +76,19 @@
             
             <label class="form-check-label">Offset</label>
             <div class="input-group mb-3">
-                <button class="btn btn-outline-primary btn-lg" @click="offset -= 0.1">-</button>
+                <button class="btn btn-outline-primary" @click="changeOffset(-0.1)">--</button>
+                <button class="btn btn-outline-primary" @click="changeOffset(-0.01)">-</button>
+                <button class="btn btn-outline-primary" @click="changeOffsetByNote(false)">-<svg width="16" height="16" version="2.0"><use href="#music-note" /></svg></button>
                 <input id="offset" placeholder="Beat Offset" class="form-control" v-model="offset">
-                <button class="btn btn-outline-primary btn-lg" @click="offset += 0.1">+</button>
+                <button class="btn btn-outline-primary" @click="changeOffsetByNote(true)">+<svg width="16" height="16" version="2.0"><use href="#music-note" /></svg></button>
+                <button class="btn btn-outline-primary" @click="changeOffset(0.01)">+</button>
+                <button class="btn btn-outline-primary" @click="changeOffset(0.1)">++</button>
             </div>
 
-            <button class="btn btn-outline-primary btn-lg">Set Offset At Current Time</button>
+            <div class="d-flex justify-content-around">
+                <button class="btn btn-outline-primary">Set Offset</button>
+                <button class="btn btn-outline-info" @click="saveBpmOffset()">Save Offset & BPM</button>
+            </div>
         </div>
         <!-- <div class="flex-fill" style="margin-bottom: auto;"></div> -->
         <div>
@@ -195,7 +227,6 @@ createApp({
         const _offset = ref(0);
         const offset = computed({
             get() {
-                console.log(_offset.value)
                 return _offset.value ? Number(_offset.value.toFixed(6)) : _offset.value
             },
             set(value) {
@@ -212,10 +243,21 @@ createApp({
             }
         });
         const musicFile = ref();
+        const _musicVolume = ref(0.5);
+        const musicVolume = computed({
+            get() {
+                return _musicVolume.value
+            },
+            set(value) {
+                _musicVolume.value = Number(value);
+            }
+        });
 
         let musicMetronome;// = new MusicMetronome('#musicControl', bpm.value, offset.value);
         onMounted(() => {
             musicMetronome = new MusicMetronome('#musicControl', bpm.value, offset.value);
+            musicMetronome.setVolume(volume.value);
+            musicMetronome.setMusicVolume(musicVolume.value);
         })
 
         watch(_volume, (newVolume) => {
@@ -244,6 +286,10 @@ createApp({
             musicMetronome.setOffset(newOffset);
         });
 
+        watch(_musicVolume, (newVolume) => {
+            musicMetronome.setMusicVolume(newVolume);
+        });
+
         function start() {
             console.log('start click')
             musicMetronome.start();
@@ -265,6 +311,25 @@ createApp({
         }
         function changeMusicFile() {
             $('#musicControl')[0].src = URL.createObjectURL($('#upload')[0].files[0]);
+            let fileName = $('#upload')[0].files[0].name;
+            let bpmOffset = localStorage.getItem(fileName)
+            if (bpmOffset != null) {
+                bpmOffset = JSON.parse(bpmOffset);
+                bpm.value = bpmOffset.bpm;
+                offset.value = bpmOffset.offset;
+            }
+        }
+        function changeOffset(diff) {
+            offset.value += diff;
+        }
+        function changeOffsetByNote(up = true) {
+            let diff = 60 / bpm.value
+            offset.value += up ? diff : -1 * diff;
+        }
+        function saveBpmOffset() {
+            let fileName = $('#upload')[0].files[0].name
+            let bpmOffset = {bpm: bpm.value, offset: offset.value}
+            localStorage.setItem(fileName, JSON.stringify(bpmOffset));
         }
 
         return {
@@ -275,6 +340,7 @@ createApp({
             offset,
             volume,
             musicFile,
+            musicVolume,
 
             // Methods
             start,
@@ -282,6 +348,9 @@ createApp({
             bpmUp,
             bpmDown,
             changeMusicFile,
+            changeOffset,
+            changeOffsetByNote,
+            saveBpmOffset,
         }
     }
 }).mount('#app')
